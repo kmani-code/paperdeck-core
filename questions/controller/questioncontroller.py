@@ -5,8 +5,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from rest_framework.decorators import api_view
 
-from questions.processor.questionprocessor import question_req_schema
+from questions.processor.questionprocessor import question_req_schema, question_generate_req_schema
 from questions.service.questionservice import QuestionService
+from papers.service.aigeneratorservice import AIGeneratorService
 from utility.decorator.auth import auth_required
 from utility.utilityobj import ErrorResponse
 
@@ -60,3 +61,33 @@ def _delete(request):
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
+
+
+@csrf_exempt
+@api_view(['POST'])
+@auth_required
+def generate_questions(request):
+    try:
+        obj = question_generate_req_schema.load(request.data)
+    except Exception as e:
+        return HttpResponse(
+            ErrorResponse(status=400, message=str(e)).to_json(),
+            status=400, content_type='application/json'
+        )
+    try:
+        generator = AIGeneratorService()
+        questions = generator.generate_questions(
+            exam=obj.exam,
+            subject=obj.subject,
+            topic=obj.topic or '',
+            q_type=obj.q_type,
+            difficulty=obj.difficulty,
+            bloom=obj.bloom,
+            count=obj.count,
+        )
+        return HttpResponse(json.dumps(questions), content_type='application/json')
+    except Exception as e:
+        return HttpResponse(
+            ErrorResponse(status=500, message=f'Generation failed: {str(e)}').to_json(),
+            status=500, content_type='application/json'
+        )

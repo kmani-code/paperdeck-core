@@ -133,6 +133,82 @@ class AIGeneratorService:
                 paper_data["sections"][i] = corrected
         return paper_data
 
+    def generate_questions(self, exam: str, subject: str, topic: str, q_type: str,
+                           difficulty: str, bloom: str, count: int) -> list:
+        if not self._client:
+            return self._mock_questions(exam, subject, topic, q_type, difficulty, bloom, count)
+
+        options_instruction = ""
+        if q_type == "MCQ":
+            options_instruction = (
+                '"options": [{"text": "Option text", "correct": true_or_false}, '
+                '{"text": "...", "correct": false}, {"text": "...", "correct": false}, '
+                '{"text": "...", "correct": false}],'
+            )
+        else:
+            options_instruction = '"options": null,'
+
+        diff_instruction = "" if difficulty == "Mixed" else f"Difficulty: {difficulty}."
+        bloom_instruction = "" if bloom == "Mixed" else f"Bloom\\'s level: {bloom}."
+
+        prompt = f"""Generate exactly {count} {q_type} questions for the {exam} exam.
+Subject: {subject}
+Topic: {topic or 'General'}
+{diff_instruction} {bloom_instruction}
+
+Return ONLY a valid JSON array. Each element must have this exact structure:
+{{
+  "exam": "{exam}",
+  "subject": "{subject}",
+  "topic": "{topic or 'General'}",
+  "q_type": "{q_type}",
+  "difficulty": "Easy|Medium|Hard|HOTS",
+  "bloom": "Remember|Understand|Apply|Analyze|Evaluate|Create",
+  "marks": <integer>,
+  "text": "Question text here",
+  {options_instruction}
+  "explanation": "Brief explanation of the correct answer"
+}}
+
+Generate high-quality, curriculum-accurate questions suitable for {exam}. Return exactly {count} questions as a JSON array."""
+
+        message = self._client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw[raw.find("["):raw.rfind("]") + 1]
+        return json.loads(raw)
+
+    def _mock_questions(self, exam: str, subject: str, topic: str, q_type: str,
+                        difficulty: str, bloom: str, count: int) -> list:
+        questions = []
+        for i in range(count):
+            q = {
+                "exam": exam,
+                "subject": subject,
+                "topic": topic or "General",
+                "q_type": q_type,
+                "difficulty": difficulty if difficulty != "Mixed" else "Medium",
+                "bloom": bloom if bloom != "Mixed" else "Apply",
+                "marks": 4,
+                "text": f"[{subject}] Sample {q_type} question {i + 1} for {exam}.",
+                "options": None,
+                "explanation": "Sample explanation.",
+            }
+            if q_type == "MCQ":
+                q["options"] = [
+                    {"text": "Option A", "correct": True},
+                    {"text": "Option B", "correct": False},
+                    {"text": "Option C", "correct": False},
+                    {"text": "Option D", "correct": False},
+                ]
+            questions.append(q)
+        return questions
+
     def _mock_paper(self, exam_type: str, subjects: list, total_marks: int) -> dict:
         config = EXAM_CONFIGS.get(exam_type, EXAM_CONFIGS["NEET"])
         sections = []

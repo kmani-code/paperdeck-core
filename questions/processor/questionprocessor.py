@@ -23,6 +23,20 @@ class QuestionRequest:
 question_req_schema = marshmallow_dataclass.class_schema(QuestionRequest)()
 
 
+@dataclass
+class QuestionGenerateRequest:
+    exam:       str
+    subject:    str
+    q_type:     str
+    difficulty: str
+    bloom:      str
+    count:      int
+    topic:      Optional[str] = ''
+
+
+question_generate_req_schema = marshmallow_dataclass.class_schema(QuestionGenerateRequest)()
+
+
 @dataclass_json
 @dataclass
 class QuestionResponse:
