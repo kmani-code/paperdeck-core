@@ -25,7 +25,7 @@ def auth_required(view_func):
         except User.DoesNotExist:
             return JsonResponse({'error': 'User not found'}, status=401)
 
-        request.scope = {'scope': 'default', 'user_id': user_id}
+        request.scope = {'scope': 'default', 'user_id': user_id, 'org_id': user.org_id}
         request.auth_user = user
         return view_func(request, *args, **kwargs)
 

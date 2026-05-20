@@ -26,16 +26,19 @@ class QuestionService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_all(self, user_id):
-        return [_build(q) for q in Question.objects.filter(owner_id=user_id)]
+    def fetch_all(self, user_id, org_id=None):
+        qs = Question.objects.filter(owner__org_id=org_id) if org_id else Question.objects.filter(owner_id=user_id)
+        return [_build(q) for q in qs]
 
-    def fetch_one(self, question_id, user_id):
+    def fetch_one(self, question_id, user_id, org_id=None):
         try:
+            if org_id:
+                return _build(Question.objects.get(id=question_id, owner__org_id=org_id))
             return _build(Question.objects.get(id=question_id, owner_id=user_id))
         except Question.DoesNotExist:
             return ErrorResponse(status=404, message='Question not found')
 
-    def create_or_update(self, req, user_id):
+    def create_or_update(self, req, user_id, org_id=None):
         if req.id is None:
             q = Question.objects.create(
                 owner_id=user_id,
@@ -53,7 +56,10 @@ class QuestionService(DBService):
             )
         else:
             try:
-                q = Question.objects.get(id=req.id, owner_id=user_id)
+                if org_id:
+                    q = Question.objects.get(id=req.id, owner__org_id=org_id)
+                else:
+                    q = Question.objects.get(id=req.id, owner_id=user_id)
             except Question.DoesNotExist:
                 return ErrorResponse(status=404, message='Question not found')
             q.exam = req.exam
@@ -70,8 +76,11 @@ class QuestionService(DBService):
             q.save()
         return _build(q)
 
-    def delete(self, question_id, user_id):
-        deleted, _ = Question.objects.filter(id=question_id, owner_id=user_id).delete()
+    def delete(self, question_id, user_id, org_id=None):
+        if org_id:
+            deleted, _ = Question.objects.filter(id=question_id, owner__org_id=org_id).delete()
+        else:
+            deleted, _ = Question.objects.filter(id=question_id, owner_id=user_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Question not found')
         return SuccessResponse(status=200, message='Question deleted')

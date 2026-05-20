@@ -27,15 +27,18 @@ class PaperService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_papers(self, user_id, course_id=None):
-        qs = Paper.objects.filter(owner_id=user_id)
+    def fetch_papers(self, user_id, course_id=None, org_id=None):
+        qs = Paper.objects.filter(owner__org_id=org_id) if org_id else Paper.objects.filter(owner_id=user_id)
         if course_id:
             qs = qs.filter(course_id=course_id)
         return [_build_paper_response(p) for p in qs]
 
-    def fetch_paper(self, paper_id, user_id):
+    def fetch_paper(self, paper_id, user_id, org_id=None):
         try:
-            paper = Paper.objects.get(id=paper_id, owner_id=user_id)
+            if org_id:
+                paper = Paper.objects.get(id=paper_id, owner__org_id=org_id)
+            else:
+                paper = Paper.objects.get(id=paper_id, owner_id=user_id)
         except Paper.DoesNotExist:
             return ErrorResponse(status=404, message='Paper not found')
         return _build_paper_response(paper)
@@ -75,10 +78,13 @@ class PaperService(DBService):
 
         return _build_paper_response(paper)
 
-    def save_paper(self, req, user_id):
+    def save_paper(self, req, user_id, org_id=None):
         if req.id:
             try:
-                paper = Paper.objects.get(id=req.id, owner_id=user_id)
+                if org_id:
+                    paper = Paper.objects.get(id=req.id, owner__org_id=org_id)
+                else:
+                    paper = Paper.objects.get(id=req.id, owner_id=user_id)
             except Paper.DoesNotExist:
                 return ErrorResponse(status=404, message='Paper not found')
             paper.title = req.title
@@ -101,8 +107,11 @@ class PaperService(DBService):
             )
         return _build_paper_response(paper)
 
-    def delete_paper(self, paper_id, user_id):
-        deleted, _ = Paper.objects.filter(id=paper_id, owner_id=user_id).delete()
+    def delete_paper(self, paper_id, user_id, org_id=None):
+        if org_id:
+            deleted, _ = Paper.objects.filter(id=paper_id, owner__org_id=org_id).delete()
+        else:
+            deleted, _ = Paper.objects.filter(id=paper_id, owner_id=user_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Paper not found')
         return SuccessResponse(status=200, message='Paper deleted')

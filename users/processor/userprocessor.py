@@ -41,6 +41,7 @@ class UserResponse:
     role: int
     plan: str
     papers_used: int
+    org_id: Optional[int] = None
 
 
 @dataclass_json
@@ -69,3 +70,17 @@ class ChangePasswordRequest:
 
 
 change_password_req_schema = marshmallow_dataclass.class_schema(ChangePasswordRequest)()
+
+
+@dataclass
+class InviteUserRequest:
+    username: str
+    email: str
+    password: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    role: int = 2  # ROLE_STAFF by default
+
+
+invite_user_req_schema = marshmallow_dataclass.class_schema(InviteUserRequest)()

@@ -9,6 +9,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from users.processor.userprocessor import (
     register_req_schema, login_req_schema,
     update_profile_req_schema, change_password_req_schema,
+    invite_user_req_schema,
 )
 from users.service.userservice import UserService
 from utility.decorator.auth import auth_required
@@ -93,3 +94,30 @@ def change_password(request):
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
+
+
+@csrf_exempt
+@api_view(['POST'])
+@auth_required
+def invite_user(request):
+    obj = invite_user_req_schema.load(request.data)
+    service = UserService()
+    resp = service.invite_user(request.auth_user, obj)
+    if isinstance(resp, ErrorResponse):
+        return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
+    return HttpResponse(resp.to_json(), content_type='application/json')
+
+
+@csrf_exempt
+@api_view(['GET'])
+@auth_required
+def list_org_users(request):
+    from users.models import User
+    import json
+    org_id = request.scope.get('org_id')
+    if not org_id:
+        return HttpResponse('[]', content_type='application/json')
+    service = UserService()
+    users = User.objects.filter(org_id=org_id)
+    data = [service.me(u).to_dict() for u in users]
+    return HttpResponse(json.dumps(data), content_type='application/json')

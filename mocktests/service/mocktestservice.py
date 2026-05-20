@@ -36,17 +36,19 @@ class MockTestService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_all(self, user_id):
-        tests = MockTest.objects.filter(owner_id=user_id).select_related('course')
-        return [_build(t) for t in tests]
+    def fetch_all(self, user_id, org_id=None):
+        qs = MockTest.objects.filter(owner__org_id=org_id) if org_id else MockTest.objects.filter(owner_id=user_id)
+        return [_build(t) for t in qs.select_related('course')]
 
-    def fetch_one(self, test_id, user_id):
+    def fetch_one(self, test_id, user_id, org_id=None):
         try:
+            if org_id:
+                return _build(MockTest.objects.select_related('course').get(id=test_id, owner__org_id=org_id))
             return _build(MockTest.objects.select_related('course').get(id=test_id, owner_id=user_id))
         except MockTest.DoesNotExist:
             return ErrorResponse(status=404, message='Mock test not found')
 
-    def create_or_update(self, req, user_id):
+    def create_or_update(self, req, user_id, org_id=None):
         if req.id is None:
             t = MockTest.objects.create(
                 owner_id=user_id,
@@ -60,11 +62,13 @@ class MockTestService(DBService):
                 ends_at=req.ends_at or None,
                 status=req.status or 'Upcoming',
             )
-            t.refresh_from_db()
             t = MockTest.objects.select_related('course').get(id=t.id)
         else:
             try:
-                t = MockTest.objects.select_related('course').get(id=req.id, owner_id=user_id)
+                if org_id:
+                    t = MockTest.objects.select_related('course').get(id=req.id, owner__org_id=org_id)
+                else:
+                    t = MockTest.objects.select_related('course').get(id=req.id, owner_id=user_id)
             except MockTest.DoesNotExist:
                 return ErrorResponse(status=404, message='Mock test not found')
             t.title = req.title
@@ -80,8 +84,11 @@ class MockTestService(DBService):
             t = MockTest.objects.select_related('course').get(id=t.id)
         return _build(t)
 
-    def delete(self, test_id, user_id):
-        deleted, _ = MockTest.objects.filter(id=test_id, owner_id=user_id).delete()
+    def delete(self, test_id, user_id, org_id=None):
+        if org_id:
+            deleted, _ = MockTest.objects.filter(id=test_id, owner__org_id=org_id).delete()
+        else:
+            deleted, _ = MockTest.objects.filter(id=test_id, owner_id=user_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Mock test not found')
         return SuccessResponse(status=200, message='Mock test deleted')

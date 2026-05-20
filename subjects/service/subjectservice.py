@@ -30,18 +30,24 @@ class SubjectService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_subjects(self, course_id):
-        subjects = Subject.objects.filter(course_id=course_id)
+    def fetch_subjects(self, course_id, org_id=None):
+        if org_id:
+            subjects = Subject.objects.filter(course_id=course_id, course__owner__org_id=org_id)
+        else:
+            subjects = Subject.objects.filter(course_id=course_id)
         return [_build_subject_response(s) for s in subjects]
 
-    def fetch_subject(self, subject_id):
+    def fetch_subject(self, subject_id, org_id=None):
         try:
-            subject = Subject.objects.get(id=subject_id)
+            if org_id:
+                subject = Subject.objects.get(id=subject_id, course__owner__org_id=org_id)
+            else:
+                subject = Subject.objects.get(id=subject_id)
         except Subject.DoesNotExist:
             return ErrorResponse(status=404, message='Subject not found')
         return _build_subject_response(subject)
 
-    def create_or_update_subject(self, req):
+    def create_or_update_subject(self, req, org_id=None):
         if req.id is None:
             subject = Subject.objects.create(
                 course_id=req.course_id,
@@ -50,7 +56,10 @@ class SubjectService(DBService):
             )
         else:
             try:
-                subject = Subject.objects.get(id=req.id)
+                if org_id:
+                    subject = Subject.objects.get(id=req.id, course__owner__org_id=org_id)
+                else:
+                    subject = Subject.objects.get(id=req.id)
             except Subject.DoesNotExist:
                 return ErrorResponse(status=404, message='Subject not found')
             subject.name = req.name
@@ -58,15 +67,21 @@ class SubjectService(DBService):
             subject.save()
         return _build_subject_response(subject)
 
-    def delete_subject(self, subject_id):
-        deleted, _ = Subject.objects.filter(id=subject_id).delete()
+    def delete_subject(self, subject_id, org_id=None):
+        if org_id:
+            deleted, _ = Subject.objects.filter(id=subject_id, course__owner__org_id=org_id).delete()
+        else:
+            deleted, _ = Subject.objects.filter(id=subject_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Subject not found')
         return SuccessResponse(status=200, message='Subject deleted')
 
-    def upload_syllabus(self, subject_id, file, name, file_size):
+    def upload_syllabus(self, subject_id, file, name, file_size, org_id=None):
         try:
-            subject = Subject.objects.get(id=subject_id)
+            if org_id:
+                subject = Subject.objects.get(id=subject_id, course__owner__org_id=org_id)
+            else:
+                subject = Subject.objects.get(id=subject_id)
         except Subject.DoesNotExist:
             return ErrorResponse(status=404, message='Subject not found')
 
@@ -78,8 +93,11 @@ class SubjectService(DBService):
         )
         return _build_syllabus_response(sf)
 
-    def delete_syllabus(self, syllabus_id):
-        deleted, _ = SyllabusFile.objects.filter(id=syllabus_id).delete()
+    def delete_syllabus(self, syllabus_id, org_id=None):
+        if org_id:
+            deleted, _ = SyllabusFile.objects.filter(id=syllabus_id, subject__course__owner__org_id=org_id).delete()
+        else:
+            deleted, _ = SyllabusFile.objects.filter(id=syllabus_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Syllabus file not found')
         return SuccessResponse(status=200, message='Syllabus file deleted')

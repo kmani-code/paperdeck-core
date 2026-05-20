@@ -26,26 +26,28 @@ def student(request):
 
 def _fetch_students(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     student_id = request.query_params.get('student_id')
     course_id = request.query_params.get('course_id')
     service = StudentService(scope)
     if student_id:
-        resp = service.fetch_one_student(student_id)
+        resp = service.fetch_one_student(student_id, org_id=org_id)
         if isinstance(resp, ErrorResponse):
             return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
         return HttpResponse(resp.to_json(), content_type='application/json')
     if course_id:
-        resp_list = service.fetch_students(course_id)
+        resp_list = service.fetch_students(course_id, org_id=org_id)
     else:
-        resp_list = service.fetch_all_students(scope['user_id'])
+        resp_list = service.fetch_all_students(scope['user_id'], org_id=org_id)
     return HttpResponse(json.dumps([s.to_dict() for s in resp_list]), content_type='application/json')
 
 
 def _post_student(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     obj = student_req_schema.load(request.data)
     service = StudentService(scope)
-    resp = service.create_or_update_student(obj)
+    resp = service.create_or_update_student(obj, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
@@ -53,6 +55,7 @@ def _post_student(request):
 
 def _delete_student(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     student_id = request.query_params.get('student_id')
     if not student_id:
         return HttpResponse(
@@ -60,7 +63,7 @@ def _delete_student(request):
             status=400, content_type='application/json'
         )
     service = StudentService(scope)
-    resp = service.delete_student(student_id)
+    resp = service.delete_student(student_id, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')

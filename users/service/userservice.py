@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import User
+from users.models import User, Organization
 from users.processor.userprocessor import UserResponse, AuthResponse
 from utility.utilityobj import ErrorResponse, SuccessResponse
 
@@ -19,6 +19,7 @@ def _build_user_response(user: User) -> UserResponse:
         role=user.role,
         plan=user.plan,
         papers_used=user.papers_used,
+        org_id=user.org_id,
     )
 
 
@@ -30,6 +31,7 @@ class UserService:
         if User.objects.filter(email=req.email).exists():
             return ErrorResponse(status=400, message='Email already registered')
 
+        org = Organization.objects.create(name=req.institute_name or req.username)
         user = User.objects.create_user(
             username=req.username,
             email=req.email,
@@ -38,6 +40,8 @@ class UserService:
             last_name=req.last_name or '',
             institute_name=req.institute_name,
             phone=req.phone,
+            org=org,
+            role=User.ROLE_ADMIN,
         )
 
         refresh = RefreshToken.for_user(user)
@@ -46,6 +50,29 @@ class UserService:
             refresh=str(refresh),
             user=_build_user_response(user),
         )
+
+    def invite_user(self, admin_user: User, req):
+        if admin_user.role != User.ROLE_ADMIN:
+            return ErrorResponse(status=403, message='Only admins can invite users')
+        if not admin_user.org_id:
+            return ErrorResponse(status=400, message='Admin has no organization')
+        if User.objects.filter(username=req.username).exists():
+            return ErrorResponse(status=400, message='Username already taken')
+        if User.objects.filter(email=req.email).exists():
+            return ErrorResponse(status=400, message='Email already registered')
+
+        user = User.objects.create_user(
+            username=req.username,
+            email=req.email,
+            password=req.password,
+            first_name=req.first_name or '',
+            last_name=req.last_name or '',
+            phone=req.phone,
+            org_id=admin_user.org_id,
+            institute_name=admin_user.institute_name,
+            role=req.role,
+        )
+        return _build_user_response(user)
 
     def login(self, req):
         user = authenticate(username=req.username, password=req.password)

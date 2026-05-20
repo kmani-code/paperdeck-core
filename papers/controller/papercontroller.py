@@ -34,12 +34,13 @@ def generate(request):
 def _save_paper(request):
     scope = request.scope
     user_id = scope['user_id']
+    org_id = scope.get('org_id')
     try:
         obj = paper_save_req_schema.load(request.data)
     except Exception as e:
         return HttpResponse(ErrorResponse(status=400, message=str(e)).to_json(), status=400, content_type='application/json')
     service = PaperService(scope)
-    resp = service.save_paper(obj, user_id)
+    resp = service.save_paper(obj, user_id, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
@@ -48,17 +49,18 @@ def _save_paper(request):
 def _fetch_papers(request):
     scope = request.scope
     user_id = scope['user_id']
+    org_id = scope.get('org_id')
     course_id = request.query_params.get('course_id')
     paper_id = request.query_params.get('paper_id')
     service = PaperService(scope)
 
     if paper_id:
-        resp = service.fetch_paper(paper_id, user_id)
+        resp = service.fetch_paper(paper_id, user_id, org_id=org_id)
         if isinstance(resp, ErrorResponse):
             return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
         return HttpResponse(resp.to_json(), content_type='application/json')
 
-    resp_list = service.fetch_papers(user_id, course_id)
+    resp_list = service.fetch_papers(user_id, course_id, org_id=org_id)
     return HttpResponse(json.dumps([p.to_dict() for p in resp_list]), content_type='application/json')
 
 
@@ -76,6 +78,7 @@ def _generate_paper(request):
 def _delete_paper(request):
     scope = request.scope
     user_id = scope['user_id']
+    org_id = scope.get('org_id')
     paper_id = request.query_params.get('paper_id')
     if not paper_id:
         return HttpResponse(
@@ -83,7 +86,7 @@ def _delete_paper(request):
             status=400, content_type='application/json'
         )
     service = PaperService(scope)
-    resp = service.delete_paper(paper_id, user_id)
+    resp = service.delete_paper(paper_id, user_id, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')

@@ -36,18 +36,24 @@ class CourseService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_courses(self, user_id):
-        courses = Course.objects.filter(owner_id=user_id)
+    def fetch_courses(self, user_id, org_id=None):
+        if org_id:
+            courses = Course.objects.filter(owner__org_id=org_id)
+        else:
+            courses = Course.objects.filter(owner_id=user_id)
         return [_build_course_response(c) for c in courses]
 
-    def fetch_course(self, course_id, user_id):
+    def fetch_course(self, course_id, user_id, org_id=None):
         try:
-            course = Course.objects.get(id=course_id, owner_id=user_id)
+            if org_id:
+                course = Course.objects.get(id=course_id, owner__org_id=org_id)
+            else:
+                course = Course.objects.get(id=course_id, owner_id=user_id)
         except Course.DoesNotExist:
             return ErrorResponse(status=404, message='Course not found')
         return _build_course_response(course)
 
-    def create_or_update_course(self, req, user_id):
+    def create_or_update_course(self, req, user_id, org_id=None):
         if req.id is None:
             course = Course.objects.create(
                 owner_id=user_id,
@@ -61,7 +67,10 @@ class CourseService(DBService):
             )
         else:
             try:
-                course = Course.objects.get(id=req.id, owner_id=user_id)
+                if org_id:
+                    course = Course.objects.get(id=req.id, owner__org_id=org_id)
+                else:
+                    course = Course.objects.get(id=req.id, owner_id=user_id)
             except Course.DoesNotExist:
                 return ErrorResponse(status=404, message='Course not found')
             course.name = req.name
@@ -74,8 +83,11 @@ class CourseService(DBService):
             course.save()
         return _build_course_response(course)
 
-    def delete_course(self, course_id, user_id):
-        deleted, _ = Course.objects.filter(id=course_id, owner_id=user_id).delete()
+    def delete_course(self, course_id, user_id, org_id=None):
+        if org_id:
+            deleted, _ = Course.objects.filter(id=course_id, owner__org_id=org_id).delete()
+        else:
+            deleted, _ = Course.objects.filter(id=course_id, owner_id=user_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Course not found')
         return SuccessResponse(status=200, message='Course deleted')

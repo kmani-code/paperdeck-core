@@ -26,12 +26,13 @@ def subject(request):
 
 def _fetch_subjects(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     service = SubjectService(scope)
     subject_id = request.query_params.get('subject_id')
     course_id = request.query_params.get('course_id')
 
     if subject_id:
-        resp = service.fetch_subject(subject_id)
+        resp = service.fetch_subject(subject_id, org_id=org_id)
         if isinstance(resp, ErrorResponse):
             return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
         return HttpResponse(resp.to_json(), content_type='application/json')
@@ -41,15 +42,16 @@ def _fetch_subjects(request):
             ErrorResponse(status=400, message='course_id is required').to_json(),
             status=400, content_type='application/json'
         )
-    resp_list = service.fetch_subjects(course_id)
+    resp_list = service.fetch_subjects(course_id, org_id=org_id)
     return HttpResponse(json.dumps([s.to_dict() for s in resp_list]), content_type='application/json')
 
 
 def _post_subject(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     obj = subject_req_schema.load(request.data)
     service = SubjectService(scope)
-    resp = service.create_or_update_subject(obj)
+    resp = service.create_or_update_subject(obj, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
@@ -57,6 +59,7 @@ def _post_subject(request):
 
 def _delete_subject(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     subject_id = request.query_params.get('subject_id')
     if not subject_id:
         return HttpResponse(
@@ -64,7 +67,7 @@ def _delete_subject(request):
             status=400, content_type='application/json'
         )
     service = SubjectService(scope)
-    resp = service.delete_subject(subject_id)
+    resp = service.delete_subject(subject_id, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
@@ -83,6 +86,7 @@ def syllabus(request):
 
 def _upload_syllabus(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     subject_id = request.data.get('subject_id')
     if not subject_id:
         return HttpResponse(
@@ -106,7 +110,7 @@ def _upload_syllabus(request):
         file_size = f'{round(size_bytes / (1024 * 1024), 1)} MB'
 
     service = SubjectService(scope)
-    resp = service.upload_syllabus(subject_id, file, file.name, file_size)
+    resp = service.upload_syllabus(subject_id, file, file.name, file_size, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')
@@ -114,6 +118,7 @@ def _upload_syllabus(request):
 
 def _delete_syllabus(request):
     scope = request.scope
+    org_id = scope.get('org_id')
     syllabus_id = request.query_params.get('syllabus_id')
     if not syllabus_id:
         return HttpResponse(
@@ -121,7 +126,7 @@ def _delete_syllabus(request):
             status=400, content_type='application/json'
         )
     service = SubjectService(scope)
-    resp = service.delete_syllabus(syllabus_id)
+    resp = service.delete_syllabus(syllabus_id, org_id=org_id)
     if isinstance(resp, ErrorResponse):
         return HttpResponse(resp.to_json(), status=resp.status, content_type='application/json')
     return HttpResponse(resp.to_json(), content_type='application/json')

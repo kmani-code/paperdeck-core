@@ -31,22 +31,31 @@ class StudentService(DBService):
     def __init__(self, scope):
         super().__init__(scope)
 
-    def fetch_students(self, course_id):
-        students = Student.objects.filter(course_id=course_id)
+    def fetch_students(self, course_id, org_id=None):
+        if org_id:
+            students = Student.objects.filter(course_id=course_id, course__owner__org_id=org_id)
+        else:
+            students = Student.objects.filter(course_id=course_id)
         return [_build_student_response(s) for s in students]
 
-    def fetch_all_students(self, user_id):
-        students = Student.objects.filter(course__owner_id=user_id).select_related('course').order_by('course__name', 'name')
+    def fetch_all_students(self, user_id, org_id=None):
+        if org_id:
+            students = Student.objects.filter(course__owner__org_id=org_id).select_related('course').order_by('course__name', 'name')
+        else:
+            students = Student.objects.filter(course__owner_id=user_id).select_related('course').order_by('course__name', 'name')
         return [_build_student_response(s, course_name=s.course.name) for s in students]
 
-    def fetch_one_student(self, student_id):
+    def fetch_one_student(self, student_id, org_id=None):
         try:
-            s = Student.objects.select_related('course').get(id=student_id)
+            if org_id:
+                s = Student.objects.select_related('course').get(id=student_id, course__owner__org_id=org_id)
+            else:
+                s = Student.objects.select_related('course').get(id=student_id)
             return _build_student_response(s, course_name=s.course.name)
         except Student.DoesNotExist:
             return ErrorResponse(status=404, message='Student not found')
 
-    def create_or_update_student(self, req):
+    def create_or_update_student(self, req, org_id=None):
         if req.id is None:
             student = Student.objects.create(
                 course_id=req.course_id,
@@ -59,7 +68,10 @@ class StudentService(DBService):
             )
         else:
             try:
-                student = Student.objects.get(id=req.id)
+                if org_id:
+                    student = Student.objects.get(id=req.id, course__owner__org_id=org_id)
+                else:
+                    student = Student.objects.get(id=req.id)
             except Student.DoesNotExist:
                 return ErrorResponse(status=404, message='Student not found')
             student.name = req.name
@@ -71,8 +83,11 @@ class StudentService(DBService):
             student.save()
         return _build_student_response(student)
 
-    def delete_student(self, student_id):
-        deleted, _ = Student.objects.filter(id=student_id).delete()
+    def delete_student(self, student_id, org_id=None):
+        if org_id:
+            deleted, _ = Student.objects.filter(id=student_id, course__owner__org_id=org_id).delete()
+        else:
+            deleted, _ = Student.objects.filter(id=student_id).delete()
         if not deleted:
             return ErrorResponse(status=404, message='Student not found')
         return SuccessResponse(status=200, message='Student deleted')
