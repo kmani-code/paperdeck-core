@@ -17,6 +17,7 @@ class QuestionRequest:
     bloom:       Optional[str] = 'Understand'
     options:     Optional[Any] = None
     explanation: Optional[str] = None
+    image_svg:   Optional[str] = None
     id:          Optional[int] = None
 
 
@@ -51,4 +52,5 @@ class QuestionResponse:
     text:        str
     options:     Optional[Any]
     explanation: Optional[str]
+    image_svg:   Optional[str]
     created_at:  str

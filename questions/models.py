@@ -14,6 +14,7 @@ class Question(models.Model):
     text       = models.TextField()
     options    = models.JSONField(null=True, blank=True)
     explanation= models.TextField(null=True, blank=True)
+    image_svg  = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

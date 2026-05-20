@@ -171,24 +171,22 @@ class AIGeneratorService:
         else:
             options_instruction = '"options": null,'
 
+        # SVG is generated in a separate call to avoid JSON corruption — only include description here
         image_field = (
             '"image_description": "One-line label for the diagram (e.g. Ray diagram of a concave lens).",'
-            '"image_svg": "Complete inline SVG markup. RULES: (1) Use single quotes for ALL XML attributes. (2) viewBox=\'0 0 400 280\' xmlns=\'http://www.w3.org/2000/svg\'. (3) No newlines — write the entire SVG as one line. (4) Use only rect, circle, line, polyline, path, text, ellipse elements. (5) Draw a clear, labelled scientific diagram relevant to the question (e.g. circuit with resistors and battery, lens with rays, cell diagram, force diagram). (6) Black strokes on white background. Example start: <svg viewBox=\'0 0 400 280\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'400\' height=\'280\' fill=\'white\'/>...</svg>",'
             if is_image_based else
-            '"image_description": null, "image_svg": null,'
+            '"image_description": null,'
         )
 
         diff_instruction = "" if difficulty == "Mixed" else f"Difficulty: {difficulty}."
         bloom_instruction = "" if bloom == "Mixed" else f"Bloom's level: {bloom}."
-
-        q_type_label = "MCQ" if is_image_based else q_type
         type_note = (
-            "These are diagram/figure-based MCQs. Each question must reference a specific diagram or figure. "
+            "These are diagram/figure-based MCQs. Each question must reference a specific diagram. "
             "Write the question text as if the student is looking at the described figure."
             if is_image_based else ""
         )
 
-        prompt = f"""Generate exactly {count} {q_type_label} questions for the {exam} exam.
+        prompt = f"""Generate exactly {count} {"MCQ" if is_image_based else q_type} questions for the {exam} exam.
 Subject: {subject}
 Topic: {topic or 'General'}
 {diff_instruction} {bloom_instruction}
@@ -217,13 +215,66 @@ Return exactly {count} questions as a JSON array. Keep explanations concise (one
                 max_tokens=8192,
                 messages=[{"role": "user", "content": prompt}]
             )
-            return self._parse_questions_response(message.content[0].text.strip())
+            questions = self._parse_questions_response(message.content[0].text.strip())
+
+            # Generate SVG diagrams in a separate plain-text call to avoid JSON corruption
+            if is_image_based:
+                for q in questions:
+                    try:
+                        time.sleep(2)  # brief gap to stay under rate limit
+                        q['image_svg'] = self._generate_svg(
+                            q.get('text', ''),
+                            q.get('image_description', ''),
+                            subject,
+                        )
+                    except Exception:
+                        q['image_svg'] = None
+
+            return questions
         except anthropic.RateLimitError:
             if _retry >= 4:
                 raise
-            wait = (2 ** _retry) * 15  # 15s, 30s, 60s, 120s
+            wait = (2 ** _retry) * 15
             time.sleep(wait)
             return self._generate_batch(exam, subject, topic, q_type, difficulty, bloom, count, _retry + 1)
+
+    def _generate_svg(self, question_text: str, image_description: str, subject: str) -> str:
+        prompt = f"""Draw a simple scientific diagram as SVG for this {subject} question.
+
+Question: {question_text}
+Diagram: {image_description or 'A relevant scientific figure'}
+
+Rules:
+- Return ONLY the SVG markup, nothing else — no markdown, no explanation
+- The opening tag MUST be exactly: <svg width="400" height="280" viewBox="0 0 400 280" xmlns="http://www.w3.org/2000/svg">
+- End with </svg>
+- White background: <rect width="400" height="280" fill="white"/>
+- Black strokes and text, clean minimal style
+- Use only: rect, circle, line, polyline, path, ellipse, text, defs, marker
+- Label key parts with <text> elements
+- Make it clear and readable for a competitive exam student"""
+
+        message = self._client.messages.create(
+            model=HAIKU_MODEL,
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip()
+        # Strip any markdown code fences
+        if "```" in raw:
+            start = raw.find("<svg")
+            end   = raw.rfind("</svg>")
+            if start != -1 and end != -1:
+                raw = raw[start:end + 6]
+        # Ensure it starts with <svg
+        if not raw.startswith("<svg"):
+            start = raw.find("<svg")
+            if start != -1:
+                raw = raw[start:]
+        # Ensure width/height attributes are present so inline SVG renders correctly
+        if raw.startswith("<svg") and 'width=' not in raw[:80]:
+            raw = raw.replace("<svg", '<svg width="400" height="280"', 1)
+        return raw
 
     @staticmethod
     def _parse_questions_response(raw: str) -> list:

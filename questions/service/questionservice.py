@@ -17,6 +17,7 @@ def _build(q: Question) -> QuestionResponse:
         text=q.text,
         options=q.options,
         explanation=q.explanation,
+        image_svg=q.image_svg,
         created_at=q.created_at.isoformat(),
     )
 
@@ -48,6 +49,7 @@ class QuestionService(DBService):
                 text=req.text,
                 options=req.options,
                 explanation=req.explanation,
+                image_svg=req.image_svg,
             )
         else:
             try:
@@ -64,6 +66,7 @@ class QuestionService(DBService):
             q.text = req.text
             q.options = req.options
             q.explanation = req.explanation
+            q.image_svg = req.image_svg
             q.save()
         return _build(q)
 
