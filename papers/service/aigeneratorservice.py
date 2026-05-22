@@ -237,6 +237,10 @@ Return exactly {count} questions as a JSON array. Keep explanations concise (one
             wait = (2 ** _retry) * 15
             time.sleep(wait)
             return self._generate_batch(exam, subject, topic, q_type, difficulty, bloom, count, _retry + 1)
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                raise RuntimeError("AI service is currently overloaded. Please wait a moment and try again.") from e
+            raise
 
     def _generate_svg(self, question_text: str, image_description: str, subject: str) -> str:
         prompt = f"""Draw a simple scientific diagram as SVG for this {subject} question.
